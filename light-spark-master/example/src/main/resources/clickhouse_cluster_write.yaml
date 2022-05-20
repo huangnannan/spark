@@ -1,0 +1,62 @@
+%YAML 1.2
+---
+name: demo
+
+persistType: hive # hive hdfs
+persistDir: /tmp/spark/app/full-batch
+persistHiveDb: "${outputDB}"
+#enableShow: false # 是否允许 show，为 false 时，下面定义的 show 将不生效
+
+# 自定义常量类，可以在SQL path 中替换 ${} 中已定义的变量
+constansCls: com.hellowzk.light.spark.MyConstants
+
+constansMap:
+  clickhouseDriver: "ru.yandex.clickhouse.ClickHouseDriver"
+  clickhouseUrl: "jdbc:clickhouse://10.130.30.99:8123/test_cluster"
+  clickhouseClusterName: "perftest_3shards_1replicas"
+  clickhouseUser: "default"
+  clickhousePWD: "E+GSoCMG"
+  clickhouseBatchSize: 100000
+  clickhouseSocketTimeout: 300000
+
+inputs:
+  - name: person
+    type: classpathFile
+    columns: name,gen,age
+    path: person.txt
+    fs: ","
+
+
+processes:
+  # sql 处理逻辑
+  - name: trip_data
+    sql: |-
+      select * from person
+    show: 20
+
+outputs:
+  - name: clickhouse1
+    type: clickhouseBalance
+    url: "${clickhouseUrl}"
+    user: "${clickhouseUser}"
+    password: "${clickhousePWD}"
+    mode: "append"
+    opts:
+      isolationLevel: NONE # 关闭事务
+      batchsize: "${clickhouseBatchSize}"
+      socket_timeout: "${clickhouseSocketTimeout}"
+
+    tables:
+      trip_data: person_all
+
+envs:
+  spark:
+    # spark参数
+    - spark.driver.memory=1g
+    - spark.driver.cores=1
+    - spark.executor.cores=1
+    - spark.executor.instances=1
+    - spark.executor.memory=1g
+    - spark.yarn.executor.memoryOverhead=1024
+    - spark.test.param=true
+    - spark.serializer=org.apache.spark.serializer.KryoSerializer
